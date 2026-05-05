@@ -58,7 +58,7 @@ class Graphics:
     def create_blocks(self, level_list: list[list]) -> tuple[object, ...]:
         blocks = [] # Populate with pygame.Rect objects.
         x, y = 0, 0 # Determines where Rectangles are placed.
-        exceptions = [0, 21, 22, 23, 24]
+        exceptions = [0, 21, 22, 23, 24] # Doodads are drawn but not collidable.
         for i in level_list:
             for ii in i:
                 if ii not in exceptions:

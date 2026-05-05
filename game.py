@@ -5,15 +5,16 @@ import player, enemy, graphics
 class Engine:
     def __init__(self) -> None:
         self.running = True
-        self.size = self.width, self.height = 1280, 720
-        self.window = pygame.display.set_mode(self.size)
+        # self._size = self._width, self._height = 1280, 720
+        self._size = self._width, self._height = 1920, 1080
+        self._window = pygame.display.set_mode(self._size)
         self.clock = pygame.time.Clock()
 
         self.level = {
             'level' : 0,
             'path' : ['level_1.txt', 'level_2.txt',
                       'level_3.txt', 'level_4.txt'],
-            'start' : [(128 * 5, 128 * 18)],
+            'start' : [(128 * 9, 128 * 20)],
             'block_list' : [[]],
             'blocks' : () # Rect objects are never moved.
             }
@@ -23,100 +24,81 @@ class Engine:
             'cooldown' : 1000
             }
         # Adds up when defeating enemies, completing levels in time.
-        self.score = 0
-        # Background music. Resets each level.
-        self.sounds = {
-            'jump' : pygame.mixer.Sound('./assets/audio/jump.wav'),
-            'land' : pygame.mixer.Sound('./assets/audio/land.wav'),
-            'player_hit' : pygame.mixer.Sound('./assets/audio/player_hit.wav'),
-            'slime_hit' : pygame.mixer.Sound('./assets/audio/slime_hit.wav'),
-            'powerup' : pygame.mixer.Sound('./assets/audio/powerup.wav'),
-            'victory' : pygame.mixer.Sound('./assets/audio/victory.wav'),
-            'death' : pygame.mixer.Sound('./assets/audio/death.wav'),
-        }
+        self.score_total = 0
 
         # Class objects.
         self.graphics = graphics.Graphics()
         self.player = player.Player()
-        self.enemy = []
+        self.enemy_list = []
 
-        # Player hitboxes.
-        self.player_rect = pygame.Rect(
-            (0, 0), (16 * 8, 16 * 8))
-        self.player_stomp = pygame.Rect(
-            (0,0), (16 * 6, 5))
-        # Determine player position, used to draw graphic.
-        self.player_static = None 
-        # Movement and camera.
-        self.speed = 4
+        # Camera movement.
         self.camera_x = 0
         self.camera_y = 0
 
-        
-
-
     def loop(self) -> None:
         # Matches drawing coordinates with player hitbox.
-        self.camera_x = self.player_rect.centerx - self.width // 2
-        self.camera_y = self.player_rect.centery - self.height // 2
-        # Matches stomp hitbox with player_rect.
-        self.player_stomp.midtop = self.player_rect.midbottom
-        
-        for i in self.enemy:
-           i.move()
-        self.movement()
-        if self.player.state == 'falling':
-            self.collision_checker()
+        self.camera_x = self.player.hitbox.centerx - self._width // 2
+        self.camera_y = self.player.hitbox.centery - self._height // 2
+        # Matches stomp hitbox with hitbox.
+        self.player.stomp.midtop = self.player.hitbox.midbottom
+        for i in self.enemy_list: # Move enemies.
+           i.move(self.level['blocks'])
+        self.player.move(self.level['blocks']) # Take movement inputs.
+        # Check for collision between player and enemies.
+        self.player.collision_checker(self.enemy_list, self.level['blocks'])
+        # Gravity only active when not jumping.
+        if self.player.state not in ['jumping']:
+            self.player.gravity(self.level['blocks'])
+        if self.player.state == 'jumping':
+            self.player.jump(self.level['blocks'])
         self.render()
-       
         
     def render(self) -> None:
         """Draws game graphics."""
-        self.window.fill((50, 50, 100))
+        self._window.fill((50, 50, 100))
         # Draw tiles.
-         
         self.graphics.draw_tiles(self.level['block_list'],
-                                 self.window, self.camera_x, self.camera_y)
+                                 self._window, self.camera_x, self.camera_y)
         
-        # Test, draw Enemy hitboxes.
-        # Body.
-        # for i in self.enemy:
-        #             pygame.draw.rect(self.window, (0, 0, 150),
-        #                     pygame.Rect(i.enemy_rect.x - self.camera_x,
-        #                         i.enemy_rect.y - self.camera_y,
-        #                         i.enemy_rect.width,
-        #                         i.enemy_rect.height))
+        # # Test, draw Enemy hitboxes.
+        # # Body.
+        # for i in self.enemy_list:
+        #             pygame.draw.rect(self._window, (0, 0, 150),
+        #                     pygame.Rect(i.hitbox.x - self.camera_x,
+        #                         i.hitbox.y - self.camera_y,
+        #                         i.hitbox.width,
+        #                         i.hitbox.height))
         # # Weakpoint.
-        # for i in self.enemy:
-        #             pygame.draw.rect(self.window, (0, 0, 150),
-        #                     pygame.Rect(i.enemy_weakpoint.x - self.camera_x,
-        #                         i.enemy_weakpoint.y - self.camera_y,
-        #                         i.enemy_weakpoint.width,
-        #                         i.enemy_weakpoint.height))
+        # for i in self.enemy_list:
+        #             pygame.draw.rect(self._window, (0, 0, 150),
+        #                     pygame.Rect(i.weakpoint.x - self.camera_x,
+        #                         i.weakpoint.y - self.camera_y,
+        #                         i.weakpoint.width,
+        #                         i.weakpoint.height))
 
         # Draw enemies.
-        for i in self.enemy:
-            i.draw(self.window, self.camera_x, self.camera_y)
+        for i in self.enemy_list:
+            i.draw(self._window, self.camera_x, self.camera_y)
         
-        # Test, draw player hitboxes.
-        # Body.
-        # pygame.draw.rect(self.window, (150, 0, 0),
-        #                     (self.player_rect.x - self.camera_x,
-        #                     self.player_rect.y - self.camera_y,
-        #                     self.player_rect.width,
-        #                     self.player_rect.height))
+        # # Test, draw player hitboxes.
+        # # Body.
+        # pygame.draw.rect(self._window, (150, 0, 0),
+        #                     (self.player.hitbox.x - self.camera_x,
+        #                     self.player.hitbox.y - self.camera_y,
+        #                     self.player.hitbox.width,
+        #                     self.player.hitbox.height))
         # # Stomp.
-        # pygame.draw.rect(self.window, (150, 0, 0),
-        #                     pygame.Rect(self.player_stomp.x - self.camera_x,
-        #                         self.player_stomp.y - self.camera_y,
-        #                         self.player_stomp.width,
-        #                         self.player_stomp.height))
+        # pygame.draw.rect(self._window, (150, 0, 0),
+        #                     pygame.Rect(self.player.stomp.x - self.camera_x,
+        #                         self.player.stomp.y - self.camera_y,
+        #                         self.player.stomp.width,
+        #                         self.player.stomp.height))
         # Draw player.
-        self.player.draw(self.window, self.player_static)
+        self.player.draw(self._window, self.player.sprite_position)
 
         pygame.display.update()
 
-    def level_timer(self) -> None:
+    def level_countdown(self) -> None:
         """
         Countdown to complete level in time, else game over.
         Resets at the start of each level.
@@ -126,13 +108,13 @@ class Engine:
     def initiate_level(self) -> None:
         self.level['block_list'] = self.load_blocks() # Converts level array to list.
         self.level['blocks'] = self.graphics.create_blocks(self.level['block_list']) # Create collisionable objects.
-        self.player_rect.center = (self.width // 2, self.height // 2)
-        self.player_static = self.player_rect.copy()
+        self.player.hitbox.center = (self._width // 2, self._height // 2)
+        self.player.sprite_position = self.player.hitbox.copy()
         # Sets player starting position, counted in tiles.
-        self.player_rect.x, self.player_rect.y = self.level['start'][self.level['level']]
+        self.player.hitbox.x, self.player.hitbox.y = self.level['start'][self.level['level']]
         # Populates level with enemies.
         for i in enemy.Enemy.populate(self.level['level']):
-            self.enemy.append(i)
+            self.enemy_list.append(i)
         # Set level coundown.
         self.countdown = 180
         # Starts level music.
@@ -157,98 +139,3 @@ class Engine:
                     if i != '':
                         list_line.append(int(i))
                 level_list.append(list_line)
-    
-    def movement(self) -> None:
-        """Handles player state and movement inputs."""
-        key = pygame.key.get_pressed()
-
-        # Gravity only active when not jumping.
-        if self.player.state not in ['jumping']:
-            self.gravity()
-        if self.player.state == 'jumping':
-            self.jump()
-
-        # Left.
-        if self.player.state != 'dead':
-            if key[pygame.K_a]:
-                if self.player.state not in ['jumping', 'falling']:
-                    self.player.state = 'moving'
-                # Test collision.
-                test = self.player_rect.copy()
-                test.x -= self.speed
-                if test.collidelist(self.level['blocks']) == -1:
-                    self.player_rect.x -= self.speed
-
-            # Right.
-            if key[pygame.K_d]:
-                if self.player.state not in ['jumping', 'falling']:
-                    self.player.state = 'moving'
-                # Test collision.
-                test = self.player_rect.copy()
-                test.x += self.speed
-                if test.collidelist(self.level['blocks']) == -1:
-                    self.player_rect.x += self.speed
-
-            # Jump.
-            if key[pygame.K_w]:
-                if self.player.landed == True:
-                    self.sounds['jump'].play()
-                    self.player.state = 'jumping'
-                    # Take the current time and add the offset in milliseconds.
-                    self.player.graphic['jumping']['length'] = pygame.time.get_ticks() + 650
-
-            # Death test. Temp.
-            if key[pygame.K_s]:
-                pygame.mixer.music.stop()
-                self.sounds['death'].play()
-                self.player.state = 'dead'
-                self.player.graphic['dead']['cooldown'] = pygame.time.get_ticks() + 1600
-
-    def collision_checker(self) -> None:
-        """Looks for collision between player and enemy objects."""
-        for i in self.enemy:
-            if i.state == 'alive':
-                if self.player_stomp.colliderect(i.enemy_weakpoint):
-                    self.sounds['slime_hit'].play()
-                    self.player.state = 'jumping'
-                    self.player.graphic['jumping']['length'] = pygame.time.get_ticks() + 350
-                    i.state = 'dead'
-                    i.graphic['dead']['cooldown'] = pygame.time.get_ticks() + 1000
-
-
-    def gravity(self) -> None:
-        """
-        Pulls the player down to the ground when not jumping.
-
-        Sets landed as true and play sound when player hits the ground.
-        """
-        test = self.player_rect.copy()
-        test.y += self.speed * 2
-        if test.collidelist(self.level['blocks']) == -1:
-            if self.player.state != 'dead':
-                self.player.state = 'falling'
-            self.player.landed = False
-            self.player_rect.y += self.speed * 2
-        else:
-            if self.player.state != 'dead':
-                self.player.state = 'idle'
-            if self.player.landed == False:
-                self.sounds['land'].play()
-                self.player.landed = True
-
-    def jump(self) -> None:
-        """
-        Moves the player upwards until the time of the jump has expired
-        or the test object collides with an object.
-        """
-        # Set landed as false while jumping, disallowing additional jumps.
-        self.player.landed = False
-        if pygame.time.get_ticks() < self.player.graphic['jumping']['length']:
-            test = self.player_rect.copy()
-            test.y -= self.speed * 2
-            if test.collidelist(self.level['blocks']) == -1:
-                self.player_rect.y -= self.speed * 2
-            else: # If colliding with Rect object, stops jump.
-                self.player.state = 'falling'
-        else: # If jump duration has passed, stop jump.
-            self.player.state = 'falling'
