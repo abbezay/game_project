@@ -6,7 +6,7 @@ path = './assets/images/'
 class Player(entity.Entity):
     def __init__(self) -> None:
         super().__init__()
-        self.health = 5
+        self.health = 4
         self.iframes = 0
         self.speed = 4
         self.spritesheet = pygame.image.load(path + 'char.png')
@@ -71,6 +71,7 @@ class Player(entity.Entity):
         self.sprite_position = None 
         self.state = 'idle'
         self.landed = False
+        self.key_aquired = False
         # Sound effects.
         self.sounds = {
             'jump' : pygame.mixer.Sound('./assets/audio/jump.wav'),
@@ -114,7 +115,6 @@ class Player(entity.Entity):
                     self.state = 'jumping'
                     # Take the current time and add the offset in milliseconds.
                     self.graphic['jumping']['length'] = pygame.time.get_ticks() + 650
-                
 
     def jump(self, blocks: list) -> None:
         """
@@ -153,6 +153,38 @@ class Player(entity.Entity):
             if self.landed == False:
                 self.sounds['land'].play()
                 self.landed = True
+
+    def take_damage(self, blocks: list, direction: str) -> None:
+        """Take damage when coming into contact with damage source.
+        TODO :: Make knockback feel smoother.
+        TODO :: View iframe window. Disallow additional knockback during."""
+        knockback_x = 128
+        knockback_y = 64
+        if direction == 'right':
+            knockback_x = -abs(128)
+        test = self.hitbox.copy()
+        test.x -= knockback_x
+        if test.collidelist(blocks) != -1:
+            if knockback_x > 0:
+                knockback_x = -abs(knockback_x)
+            else:
+                knockback_x = abs(knockback_x)
+        self.hitbox.x -= knockback_x
+        self.hitbox.y -= knockback_y
+
+        # Add iframes so player cannot be damaged again instantly.
+        if self.iframes < pygame.time.get_ticks():
+            # One second must pass before taking damage again.
+            self.iframes = pygame.time.get_ticks() + 1000
+            self.health -= 1
+            self.sounds['player_hit'].play()
+
+        # Damaged cause is enough to kill the player.
+        if self.health == 0:
+            pygame.mixer.music.stop()
+            self.sounds['death'].play()
+            self.state = 'dead'
+            self.graphic['dead']['cooldown'] = pygame.time.get_ticks() + 1600
 
     def collision_checker(self, enemy_list: list, blocks: list) -> None:
         """Looks for collision between player and any living enemy."""
@@ -194,16 +226,16 @@ class Player(entity.Entity):
                         self.iframes = pygame.time.get_ticks() + 1000
                         self.health -= 1
                         self.sounds['player_hit'].play()
-                        if self.health == 0:
-                            pygame.mixer.music.stop()
-                            self.sounds['death'].play()
-                            self.state = 'dead'
-                            self.graphic['dead']['cooldown'] = pygame.time.get_ticks() + 1600
+                        
 
-    def draw(self, window, coordinates: object) -> None:
-        """Animate character for all states."""
+    def draw(self, window, coordinates: object) -> bool:
+        """
+        Animate character for all states.
+        Returns boolean if dead and animation has been played out.
+        """
         # TODO :: Add variables that hold complex values in order to increase readability.
-        
+        # Done.
+
         time = pygame.time.get_ticks()
         current_state = self.graphic[self.state]
         drawn_frame = current_state['frames'][current_state['frame']]
@@ -212,8 +244,9 @@ class Player(entity.Entity):
             pygame.Surface.blit(window, drawn_frame, (coordinates))
             if time > current_state['cooldown']:
                 current_state['frame'] += 1
+                self.graphic['dead']['cooldown'] = pygame.time.get_ticks() + 2500
                 if current_state['frame'] >= len(current_state['frames']):
-                    current_state['frame'] = 1      
+                    return True
         else:
             pygame.Surface.blit(window, drawn_frame, (coordinates))
             # Switch between frames.
