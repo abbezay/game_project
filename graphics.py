@@ -4,6 +4,11 @@ path = './assets/images/'
 class Graphics:
     def __init__(self) -> None:
         self.tileset = pygame.image.load(path + 'tileset.png')
+        self.backgrounds = {
+            'main_menu' : pygame.image.load(path + 'mainmenu.png'),
+            'game_over_loss' : pygame.image.load(path + 'game_over_loss.png'),
+            'game_over_win' : pygame.image.load(path + 'game_over_win.png')
+        }
         self.tile_size = (16 * 8, 16 * 8)
         self.tile = {
             # Full block.
@@ -54,9 +59,11 @@ class Graphics:
             24 : pygame.Surface.subsurface(self.tileset,
                 ((self.tile_size[0] * 3, self.tile_size[1] * 3), self.tile_size)),
             25 : pygame.Surface.subsurface(self.tileset,
-                ((self.tile_size[0] * 3, self.tile_size[1] * 4), self.tile_size)),
+                ((self.tile_size[0] * 4, self.tile_size[1] * 3), self.tile_size)),
         }
         self._myfont = pygame.font.Font('./assets/press_start_2p.ttf', 38)
+        self.cooldown = 0
+        
 
 
     def create_blocks(self, level_list: list[list]) -> tuple[object, ...]:
@@ -109,32 +116,62 @@ class Graphics:
                    engine._window, engine._width // 2, 80,
                    centered = True)
 
-    def draw_main_menu(self, window, engine, event: pygame) -> None:
-        """Draws the interactable main menu."""
-        window.fill((0, 185, 50))
+    def draw_main_menu(self, window, engine, event: pygame) -> bool:
+        """Draws the interactable main menu.
+        
+        Returns:
+            If play is clicked return True."""
+        pygame.Surface.blit(window, self.backgrounds['main_menu'], (0, 0))
         self.write('To Be Determined',
                    engine._window, engine._width // 2, engine._height // 5,
                    centered = True)
-        engine.button_start.draw(window, self)
-        engine.button_exit.draw(window, self)
-        if engine.button_start.press(event):
+        engine.buttons['start'].draw(window, self)
+        engine.buttons['exit'].draw(window, self)
+        if engine.buttons['start'].press(event):
             return True
-        if engine.button_exit.press(event):
-            pygame.time.wait(360) # Allows click to play before exit.
+        if engine.buttons['exit'].press(event):
+            pygame.time.wait(360) # Allows click.wav to play before exit.
             engine.running = False
 
-    def draw_game_over(self, window, engine, event: pygame) -> None:
-        """Draws the interactable game over screen."""
-        window.fill((0, 185, 50))
+    def draw_game_over_loss(self, window, engine, event: pygame) -> bool:
+        """Draws the interactable game over screen.
+        
+        Return:
+            If return to main menu is clicked return True."""
+        pygame.Surface.blit(window, self.backgrounds['game_over_loss'], (0, 0))
         self.write('Game Over',
                    engine._window, engine._width // 2, engine._height // 5,
                    centered = True)
         self.write('Score: ' + str(engine.score),
                    engine._window, engine._width // 2, engine._height // 4,
                    centered = True)
-        engine.button_return.draw(window, self)
-        if engine.button_return.press(event):
-            return True
+        if self.cooldown == 0:
+            self.cooldown = pygame.time.get_ticks() + 3000
+        elif self.cooldown < pygame.time.get_ticks():
+            engine.buttons['return'].draw(window, self)
+            if engine.buttons['return'].press(event):
+                self.cooldown = 0
+                return True
+
+    def draw_game_over_win(self, window, engine, event: pygame) -> bool:
+        """Draws the interactable victory screen.
+        
+        Return:
+            If return to main menu is clicked return True."""
+        pygame.Surface.blit(window, self.backgrounds['game_over_win'], (0, 0))
+        self.write('You Win!',
+                   engine._window, engine._width // 2, engine._height // 5,
+                   centered = True)
+        self.write('Score: ' + str(engine.score),
+                   engine._window, engine._width // 2, engine._height // 4,
+                   centered = True)
+        if self.cooldown == 0:
+            self.cooldown = pygame.time.get_ticks() + 10000
+        elif self.cooldown < pygame.time.get_ticks():
+            engine.buttons['return'].draw(window, self)
+            if engine.buttons['return'].press(event):
+                self.cooldown = 0 
+                return True
 
     def write(self, text: str, window,
               x: int, y: int, centered = False) -> None:
@@ -175,7 +212,7 @@ class Button:
                      size: tuple[int]) -> None:
             self.text = text
             self.button = pygame.Rect((0, 0), size)
-            self.button.center = center_position
+            self.button.center = center_position # Center the rectangle.
             self.colour_base = (75, 75, 200)
             self.colour_hover = (0, 0, 100)
             self.click = pygame.mixer.Sound('./assets/audio/click.wav')

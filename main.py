@@ -13,8 +13,6 @@ def main():
 if __name__ == '__main__':
     pygame.init()
     pygame.mixer.init()
-    pygame.mixer.music.load('./assets/audio/background.mp3')
-    pygame.mixer.music.set_volume(0.5)
     pygame.display.set_caption('To Be Determined')
     game = game.Engine()
     main()

@@ -10,11 +10,14 @@ class Engine:
         self._window = pygame.display.set_mode(self._size)
         self.clock = pygame.time.Clock()
         self.level = {
-            'current_level' : 0,
+            'current_level' : 4,
             'path' : ['level_0.txt', 'level_1.txt',
-                      'level_2.txt', 'level_3.txt'],
+                      'level_2.txt', 'level_3.txt',
+                      'level_4.txt'],
             # Starting position counted in blocks x, then y.
-            'start' : [(128 * 9, 128 * 20), (128 * 7, 128 * 9)],
+            'start' : [(128 * 9, 128 * 20), (128 * 7, 128 * 9),
+                       (128 * 8, 128 * 20), (128 * 13, 128 * 8),
+                       (128 * 14, 128 * 8)],
             'block_list' : [[]],
             'blocks' : () # Rect objects are never moved.
             }
@@ -38,33 +41,59 @@ class Engine:
         # Sets what is being rendered.
         self.state = 'main menu'
         self.level_initated = False
-        self.button_start = graphics.Button('Start Game',
-                                (self._width // 2, self._height // 3),
-                                (450, 100))
-        self.button_exit = graphics.Button('Exit Game',
-                                (self._width // 2, self._height // 2),
-                                (450, 100))
-        self.button_return = graphics.Button('Return to Main Menu',
-                                (self._width // 2, self._height // 2),
-                                (900, 150))
+        self.music_playing = False
+        self.buttons = {
+            'start' : graphics.Button('Start Game',
+                        (self._width // 2, self._height // 3),
+                        (450, 100)),
+            'exit' : graphics.Button('Exit Game',
+                        (self._width // 2, self._height // 2),
+                        (450, 100)),
+            'return' : graphics.Button('Return to Main Menu',
+                        (self._width // 2, self._height // 2),
+                        (900, 150))
+            }
 
     def loop(self, event: pygame) -> None:
         """Loops the game dependant on current state."""
         # Main menu.
         if self.state == 'main menu':
+            if self.music_playing == False:
+                self.music_playing = True
+                pygame.mixer.music.load('./assets/audio/main_menu.mp3')
+                pygame.mixer.music.play(-1)
             if self.graphics.draw_main_menu(self._window, self, event):
+                self.music_playing = False
+                pygame.mixer.music.stop()
                 self.state = 'playing'
             pygame.display.flip()
             
         # Game over.
-        elif self.state == 'game over':
-            if self.graphics.draw_game_over(self._window, self, event):
+        elif self.state == 'game_over':
+            if self.music_playing == False:
+                self.music_playing = True
+                pygame.mixer.music.load('./assets/audio/game_over_loss.mp3')
+                pygame.mixer.music.play(-1)
+            if self.graphics.draw_game_over_loss(self._window, self, event):
+                # Reset attributes to allow a new run.
+                self.level['current_level'] = 0
+                self.level_initated = False
+                self.music_playing = False
+                self.score = 0
+                self.player.key_aquired = False
+                self.player.health = 4
+                self.player.state = 'alive'
                 self.state = 'main menu'
             pygame.display.flip()
             
         # Playing level.
         elif self.state == 'playing':
+            if self.music_playing == False:
+                self.music_playing = True
+                pygame.mixer.music.load('./assets/audio/background.mp3')
+                pygame.mixer.music.play()
             if self.level_initated == False:
+                pygame.mixer.music.rewind()
                 self.initiate_level()
                 self.level_initated = True
             # Matches drawing coordinates with player hitbox.
@@ -79,11 +108,14 @@ class Engine:
                     self.score += 20
             for object in self.object_list: # Object collisions.
                 if object.collide(self.player):
-                    # Player beat level.
-                    self.score += self.countdown['time'] * 2
+                    # Player finish a level.
+                    self.score += self.countdown['time'] * 3
+                    self.score += self.player.health * 25
+                    self.player.key_aquired = False
                     self.level['current_level'] += 1
                     if self.level['current_level'] >= len(self.level['path']):
-                        self.state = 'game over'
+                        self.music_playing = False
+                        self.state = 'victory'
                     else:
                         self.level_initated = False
                     return
@@ -95,6 +127,24 @@ class Engine:
                 self.player.jump(self.level['blocks'])
             self.level_countdown()
             self.render_level()
+
+        # Victory.
+        elif self.state == 'victory':
+            if self.music_playing == False:
+                self.music_playing = True
+                pygame.mixer.music.load('./assets/audio/game_over_win.mp3')
+                pygame.mixer.music.play(-1)
+            if self.graphics.draw_game_over_win(self._window, self, event):
+                # Reset attributes to allow a new run.
+                self.level['current_level'] = 0
+                self.level_initated = False
+                self.music_playing = False
+                self.score = 0
+                self.player.key_aquired = False
+                self.player.health = 4
+                self.player.state = 'alive'
+                self.state = 'main menu'
+            pygame.display.flip()
         
     def render_level(self) -> None:
         """Draws game graphics."""
@@ -119,14 +169,6 @@ class Engine:
         #                         i.weakpoint.width,
         #                         i.weakpoint.height))
 
-        # Draw objects.
-        for i in self.object_list:
-            i.draw(self._window, self.camera_x, self.camera_y)
-        # Draw enemies.
-        for i in self.enemy_list:
-            i.draw(self._window, self.camera_x, self.camera_y)
-        
-        
         # # Troubleshooting aid: display player hitboxes.
         # # Body.
         # pygame.draw.rect(self._window, (150, 0, 0),
@@ -140,11 +182,20 @@ class Engine:
         #                         self.player.stomp.y - self.camera_y,
         #                         self.player.stomp.width,
         #                         self.player.stomp.height))
-        # Draw player.
+
+        
+        # Draw objects.
+        for i in self.object_list:
+            i.draw(self._window, self.camera_x, self.camera_y)
+        # Draw enemies.
+        for i in self.enemy_list:
+            i.draw(self._window, self.camera_x, self.camera_y)
+        # Draw UI.
         self.graphics.draw_ui(self._window, self)
+        # Draw player.
         if self.player.draw(self._window, self.player.sprite_position):
-            pygame.mixer.music.stop()
-            self.state = 'game over'
+            self.music_playing = False
+            self.state = 'game_over'
         pygame.display.update()
 
     def level_countdown(self) -> None:
@@ -154,7 +205,9 @@ class Engine:
         """
         if self.countdown['time'] == 0:
             pygame.mixer.music.stop()
-            self.state = 'game over'
+            self.player.sounds['death']
+            pygame.time.wait(2000)
+            self.state = 'game_over'
         
         if self.countdown['cooldown'] < pygame.time.get_ticks():
             self.countdown['time'] -= 1
@@ -177,7 +230,7 @@ class Engine:
         # Sets player starting position, counted in tiles.
         self.player.hitbox.x, self.player.hitbox.y = self.level['start'][self.level['current_level']]
         # Set level coundown.
-        self.countdown['time'] = 180
+        self.countdown['time'] = 60
         self.countdown['cooldown'] = pygame.time.get_ticks() + 1000
         # Starts level music.
         pygame.mixer.music.play()

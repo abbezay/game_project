@@ -75,8 +75,8 @@ class Door(Object):
         self.graphic = pygame.Surface.subsurface(self.spritesheet,
                        ((self.sprite_size[0], self.sprite_size[1] * 4), self.sprite_size))
         self.graphic = pygame.transform.scale2x(self.graphic)
-        self.hitbox.width = self.hitbox[0] * 2
-        self.hitbox.height = self.hitbox[1] * 2
+        self.hitbox.width = self.hitbox.width * 2
+        self.hitbox.height = self.hitbox.height * 2
         self.door_opening = False
         self.cooldown = 0
     
@@ -85,14 +85,16 @@ class Door(Object):
         # Player interacts with object.
         if self.door_opening:
             if self.cooldown < pygame.time.get_ticks():
-                pygame.mixer.music.stop()
-                player.sounds['victory'].play()
+                # Wait for cooldown before finishing level.
                 return True    
         elif player.key_aquired == True:
             if self.hitbox.colliderect(player.hitbox):
+                # Set cooldown before level is finished.
+                pygame.mixer.music.stop()
+                player.sounds['victory'].play()
                 self.door_opening = True
-                self.cooldown = pygame.time.get_ticks() + 1000
-            
+                self.cooldown = pygame.time.get_ticks() + 2400
+                            
 
 class Heart(Object):
     """Adds one health back to player when picked up."""

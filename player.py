@@ -40,6 +40,7 @@ class Player(entity.Entity):
                 ],
                 'frame' : 0,
                 'cooldown' : 0,
+                'length' : 0
             },
             'falling' : {
                 'frames' : [
@@ -157,13 +158,14 @@ class Player(entity.Entity):
     def take_damage(self, blocks: list, direction: str) -> None:
         """Take damage when coming into contact with damage source.
         TODO :: Make knockback feel smoother.
-        TODO :: View iframe window. Disallow additional knockback during."""
+        TODO :: View iframe window. Disallow additional knockback meanwhile."""
         knockback_x = 128
         knockback_y = 64
         if direction == 'right':
             knockback_x = -abs(128)
         test = self.hitbox.copy()
         test.x -= knockback_x
+        test.y -= knockback_y
         if test.collidelist(blocks) != -1:
             if knockback_x > 0:
                 knockback_x = -abs(knockback_x)
@@ -174,8 +176,8 @@ class Player(entity.Entity):
 
         # Add iframes so player cannot be damaged again instantly.
         if self.iframes < pygame.time.get_ticks():
-            # One second must pass before taking damage again.
-            self.iframes = pygame.time.get_ticks() + 1000
+            # Time must pass before taking damage again.
+            self.iframes = pygame.time.get_ticks() + 500
             self.health -= 1
             self.sounds['player_hit'].play()
 
@@ -186,52 +188,11 @@ class Player(entity.Entity):
             self.state = 'dead'
             self.graphic['dead']['cooldown'] = pygame.time.get_ticks() + 1600
 
-    def collision_checker(self, enemy_list: list, blocks: list) -> None:
-        """Looks for collision between player and any living enemy."""
-        for i in enemy_list:
-            if i.state == 'alive':
-                # Defeat enemy.
-                if self.state == 'falling':
-                    if self.stomp.colliderect(i.weakpoint):
-                        self.sounds['slime_hit'].play()
-                        self.state = 'jumping'
-                        self.graphic['jumping']['length'] = pygame.time.get_ticks() + 350
-                        i.state = 'dead'
-                        i.hazard = False
-                        i.graphic['dead']['cooldown'] = pygame.time.get_ticks() + 1000
-                # Take damage from enemy.
-            if i.hazard == True:
-                if self.hitbox.colliderect(i.hitbox):
-                    knockback_x = 128
-                    knockback_y = 64
-                    # Knockback left.
-                    if self.hitbox.centerx < i.hitbox.centerx + 1:
-                        test = self.hitbox.copy()
-                        test.x -= knockback_x
-                        if test.collidelist(blocks) != -1:
-                            knockback_x = -abs(knockback_x)
-                        self.hitbox.x -= knockback_x
-                        self.hitbox.y -= knockback_y
-                    # Knockback right.
-                    elif self.hitbox.centerx > i.hitbox.centerx - 1:
-                        test = self.hitbox.copy()
-                        test.x += knockback_x
-                        if test.collidelist(blocks) != -1:
-                            print('collision right')
-                            knockback_x = -abs(knockback_x)
-                        self.hitbox.x += knockback_x
-                        self.hitbox.y -= knockback_y
-                    if self.iframes < pygame.time.get_ticks():
-                        # One second must pass before taking damage again.
-                        self.iframes = pygame.time.get_ticks() + 1000
-                        self.health -= 1
-                        self.sounds['player_hit'].play()
-                        
-
     def draw(self, window, coordinates: object) -> bool:
         """
         Animate character for all states.
-        Returns boolean if dead and animation has been played out.
+        Returns:
+            After death animations returns True.
         """
         # TODO :: Add variables that hold complex values in order to increase readability.
         # Done.
@@ -246,6 +207,7 @@ class Player(entity.Entity):
                 current_state['frame'] += 1
                 self.graphic['dead']['cooldown'] = pygame.time.get_ticks() + 2500
                 if current_state['frame'] >= len(current_state['frames']):
+                    current_state['frame'] = 1
                     return True
         else:
             pygame.Surface.blit(window, drawn_frame, (coordinates))
